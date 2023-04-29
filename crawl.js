@@ -1,6 +1,22 @@
 const {JSDOM} = require('jsdom')
 
-async function crawlPage(currentURL) {
+async function crawlPage(baseURL, currentURL, pages) {
+
+    const baseURLObj = new URL(baseURL)
+    const currentURLObj = new URL(currentURL)
+
+    if(baseURLObj.hostname !== currentURLObj.hostname) {
+        return pages
+    }
+
+    const normalizedURL = normalizeURL(currentURL)
+    if(pages[normalizedURL] > 0) {
+        pages[normalizedURL] = pages[normalizedURL] + 1
+        return pages
+    }
+
+    pages[normalizedURL] = 1
+
     console.log(`activily crawling: ${currentURL}`)
 
     try {
@@ -9,18 +25,26 @@ async function crawlPage(currentURL) {
 
     if(!contentType.includes("text/html")) {
         console.log(`error in fetch: reason wrong content type ${contentType} on page ${currentURL}`)
-        return
+        return pages
     }
 
     if(response.status > 399) {
         console.log(`error in fetch with status code ${response.status} on page ${currentURL}`)
-        return
+        return pages
     }
 
-    console.log(await response.text())
+    const htmlBody = await response.text()
+    const urlsFromBody = getURLsFromHTML(htmlBody, baseURL)
+
+    console.log(urlsFromBody.length)
+    for (const url of urlsFromBody) {
+        pages = await crawlPage(baseURL, url, pages)
+    }
     } catch (error) {
         console.log(`error in fetch: ${error.message} on page ${currentURL}`)
     }
+
+    return pages
 }
 
 function getURLsFromHTML(htmlBody, baseURL) {
